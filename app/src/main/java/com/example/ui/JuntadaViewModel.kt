@@ -79,11 +79,19 @@ class JuntadaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun addParticipant(name: String) {
+        addParticipants(listOf(name))
+    }
+
+    fun addParticipants(names: List<String>) {
         val current = selectedJuntada.value ?: return
-        val trimmed = name.trim()
-        if (trimmed.isEmpty() || current.participants.any { it.equals(trimmed, ignoreCase = true) }) return
+        val newNames = names.map { it.trim() }.filter { it.isNotEmpty() }
+        val toAdd = newNames.filter { newName ->
+            !current.participants.any { it.equals(newName, ignoreCase = true) }
+        }
+        if (toAdd.isEmpty()) return
+        
         viewModelScope.launch {
-            val updatedParticipants = current.participants + trimmed
+            val updatedParticipants = current.participants + toAdd
             val updated = current.copy(participants = updatedParticipants)
             repository.updateJuntada(updated)
         }

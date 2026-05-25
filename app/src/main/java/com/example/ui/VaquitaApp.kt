@@ -109,16 +109,9 @@ fun Modifier.glassPanel(
     borderWidth: Float = 0.5f,
     elevation: Float = 6f
 ): Modifier {
-    // We enforce 0.5dp crisp white highlight border for ALL panels to precisely unify the Liquid Glass aesthetic.
-    val actualBorderWidth = 0.5f
+    val actualBorderWidth: Float = borderWidth
 
-    val base = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-        // Hardware-accelerated background blur using Modifier.blur() for real-time frosted glass.
-        // We apply a subtle blur to mimic the refractive properties of thick glass.
-        // NOTE: In production compose, true backdrop blur requires RenderNode tricks, 
-        // but we use Native blur as requested for the liquid aesthetics.
-        this.blur(radius = 0.1.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-    } else this
+    val base = this
 
     return base.drawBehind {
         // Drop shadow for floating glass depth
@@ -131,18 +124,20 @@ fun Modifier.glassPanel(
 
         // Frost translucent glass filling base
         drawRoundRect(
-            color = Color.White.copy(alpha = 0.12f),
+            color = Color.White.copy(alpha = 0.08f),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
         )
 
-        // GLASS DEPTH: Diagonal Gloss linear reflection overlay (simulating curved glass specular reflection)
+        // GLASS DEPTH: Liquid Reflection Shader Map
+        // Multi-stop diagonal linear gradient simulating light refracting and curving through thick liquid glass
         drawRoundRect(
             brush = Brush.linearGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.25f),
-                    Color.White.copy(alpha = 0.05f),
-                    Color.Transparent,
-                    Color.White.copy(alpha = 0.08f)
+                colorStops = arrayOf(
+                    0.0f to Color.White.copy(alpha = 0.20f),
+                    0.3f to Color.Transparent,
+                    0.5f to Color.White.copy(alpha = 0.05f),
+                    0.8f to Color.Transparent,
+                    1.0f to Color.White.copy(alpha = 0.10f)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(size.width, size.height)
@@ -150,20 +145,103 @@ fun Modifier.glassPanel(
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
         )
 
-        // SPECULAR EDGES: Thin (0.5dp), crisp white highlight border to the upper and left edges
+        // SPECULAR EDGES (3D Lip): Inner stroke outlining the squircle
+        // Top-left: sharp bright white specular highlight (0.45f).
+        // Bottom-right: fades out into a dark contrast shadow.
+        val strokeWidth = 1.dp.toPx()
         drawRoundRect(
             brush = Brush.linearGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.35f),
-                    Color.White.copy(alpha = 0.10f),
+                    Color.White.copy(alpha = 0.45f),
                     Color.Transparent,
-                    Color.Transparent
+                    Color.Black.copy(alpha = 0.3f)
                 ),
                 start = Offset(0f, 0f),
-                end = Offset(size.width * 0.7f, size.height * 0.7f)
+                end = Offset(size.width, size.height)
             ),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius),
-            style = Stroke(width = actualBorderWidth)
+            style = Stroke(width = strokeWidth)
+        )
+    }
+}
+
+@Composable
+fun VaquitaGlassButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable RowScope.() -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Box(
+        modifier = modifier
+            .bounceScale(interactionSource)
+            .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 4f)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            content = content
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun VaquitaGlassTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: (@Composable () -> Unit)? = null,
+    placeholder: (@Composable () -> Unit)? = null,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null,
+    singleLine: Boolean = false,
+    textStyle: androidx.compose.ui.text.TextStyle = LocalTextStyle.current,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: androidx.compose.foundation.text.KeyboardActions = androidx.compose.foundation.text.KeyboardActions.Default,
+) {
+    Box(
+        modifier = modifier
+            .glassPanel(cornerRadius = 24f, borderWidth = 0.5f, elevation = 2f)
+    ) {
+        androidx.compose.material3.TextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = label,
+            placeholder = placeholder,
+            leadingIcon = leadingIcon,
+            trailingIcon = trailingIcon,
+            singleLine = singleLine,
+            textStyle = textStyle.copy(color = Color.White),
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            shape = RoundedCornerShape(24.dp),
+            colors = androidx.compose.material3.TextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
+                cursorColor = Color(0xFFA5F3FC),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedLabelColor = Color(0xFFA5F3FC),
+                unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
+                focusedPlaceholderColor = Color.White.copy(alpha = 0.5f),
+                unfocusedPlaceholderColor = Color.White.copy(alpha = 0.3f),
+                focusedLeadingIconColor = Color(0xFFA5F3FC),
+                unfocusedLeadingIconColor = Color.White.copy(alpha = 0.5f)
+            )
         )
     }
 }
@@ -387,18 +465,14 @@ fun HomeScreen(viewModel: JuntadaViewModel) {
                     modifier = Modifier
                         .bounceScale(fabInteraction)
                         .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 20f)
-                        .background(Color(0xFF0F172A).copy(alpha = 0.55f), RoundedCornerShape(100.dp))
                         .clickable(
                             interactionSource = fabInteraction,
                             indication = null,
                             onClick = { showCreateDialog = true }
                         )
-                        .padding(4.dp)
+                        .padding(horizontal = 24.dp, vertical = 14.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(100.dp))
-                            .padding(horizontal = 24.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
@@ -671,7 +745,6 @@ fun DetailScreen(
                         modifier = Modifier
                             .weight(1f)
                             .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 10f)
-                            .background(Color(0xFF0F172A).copy(alpha = 0.55f), RoundedCornerShape(100.dp))
                             .padding(4.dp)
                     ) {
                         val currentOffset = pagerState.currentPage + pagerState.currentPageOffsetFraction
@@ -686,7 +759,6 @@ fun DetailScreen(
                                         translationX = size.width * currentOffset
                                     }
                                     .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 2f)
-                                    .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(100.dp))
                             )
                         }
 
@@ -737,7 +809,6 @@ fun DetailScreen(
                             modifier = Modifier
                                 .bounceScale(addGastoInteraction)
                                 .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 10f)
-                                .background(Color(0xFF0F172A).copy(alpha = 0.55f), RoundedCornerShape(100.dp))
                                 .clickable(
                                     interactionSource = addGastoInteraction,
                                     indication = null,
@@ -818,6 +889,7 @@ fun DetailScreen(
             juntada = safeJuntada,
             friendGroups = friendGroups,
             onAdd = { viewModel.addParticipant(it) },
+            onAddMultiple = { viewModel.addParticipants(it) },
             onRemove = { viewModel.removeParticipant(it) },
             onDismiss = { showEditFriendsDialog = false }
         )
@@ -867,18 +939,12 @@ fun GastosTab(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = onEditFriendsPrompt,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFA5F3FC),
-                        contentColor = Color(0xFF0F172A)
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.bounceScale(emptyBtn1Interaction)
+                VaquitaGlassButton(
+                    onClick = onEditFriendsPrompt
                 ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Integrar Amigos", fontWeight = FontWeight.ExtraBold)
+                    Text("Integrar Amigos", color = Color.White, fontWeight = FontWeight.ExtraBold)
                 }
             }
         } else if (gastos.isEmpty()) {
@@ -912,18 +978,12 @@ fun GastosTab(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = onAddPrompt,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFA5F3FC),
-                        contentColor = Color(0xFF0F172A)
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.bounceScale(emptyBtn2Interaction)
+                VaquitaGlassButton(
+                    onClick = onAddPrompt
                 ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Agregar Primer Gasto", fontWeight = FontWeight.ExtraBold)
+                    Text("Agregar Primer Gasto", color = Color.White, fontWeight = FontWeight.ExtraBold)
                 }
             }
         } else {
@@ -1216,27 +1276,21 @@ fun SaldosTab(
                             }
                         }
                         Spacer(modifier = Modifier.height(20.dp))
-                        Button(
+                        VaquitaGlassButton(
                             onClick = {
                                 clipboardManager.setText(AnnotatedString(shareableTextByVaquita))
                                 Toast.makeText(context, "¡Cuentas copiadas! Pegalas en el WhatsApp", Toast.LENGTH_SHORT).show()
                             },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFA5F3FC),
-                                contentColor = Color(0xFF0F172A)
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .bounceScale(copyBtnInteraction)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Share,
                                 contentDescription = null,
+                                tint = Color.White,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Copiar Cuentas para WhatsApp", fontWeight = FontWeight.ExtraBold)
+                            Text("Copiar Cuentas para WhatsApp", color = Color.White, fontWeight = FontWeight.ExtraBold)
                         }
                     }
                 }
@@ -1387,8 +1441,8 @@ fun JuntadaCreateDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
-                .glassPanel(cornerRadius = 70f, borderWidth = 3.0f, elevation = 16f)
-                .background(Color(0xFF0F172A).copy(alpha = 0.88f), RoundedCornerShape(28.dp))
+                .glassPanel(cornerRadius = 70f, borderWidth = 0.5f, elevation = 16f)
+                .background(Color(0xFF0F172A).copy(alpha = 0.75f), RoundedCornerShape(28.dp))
         ) {
             Column(
                 modifier = Modifier
@@ -1403,21 +1457,11 @@ fun JuntadaCreateDialog(
                     color = Color.White
                 )
 
-                OutlinedTextField(
+                VaquitaGlassTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Nombre de la Juntada") },
                     placeholder = { Text("Asado del finde, Escapada, etc.") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFA5F3FC),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                        focusedLabelColor = Color(0xFFA5F3FC),
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedPlaceholderColor = Color.White.copy(alpha = 0.3f),
-                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.3f)
-                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("juntada_name_input"),
@@ -1449,36 +1493,48 @@ fun JuntadaCreateDialog(
                             Box(
                                 modifier = Modifier
                                     .bounceScale(groupInteraction)
-                                    .background(Color(0xFFA5F3FC).copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                                    .border(1.dp, Color(0xFFA5F3FC).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .glassPanel(cornerRadius = 24f, borderWidth = 0.5f, elevation = 2f)
+                                    .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                                     .clickable(
                                         interactionSource = groupInteraction,
-                                        indication = LocalIndication.current
+                                        indication = null
                                     ) {
-                                        group.participants.forEach { member ->
-                                            if (!friendsList.contains(member)) {
-                                                friendsList.add(member)
-                                            }
-                                        }
+                                        val newMembers = group.participants.filter { !friendsList.contains(it) }
+                                        friendsList.addAll(newMembers)
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Groups,
-                                        contentDescription = null,
-                                        tint = Color(0xFFA5F3FC),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = group.name,
-                                        color = Color(0xFFA5F3FC),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(100.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Groups,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = group.name,
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${group.participants.size} miembros",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1490,44 +1546,37 @@ fun JuntadaCreateDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
+                    VaquitaGlassTextField(
                         value = currentFriend,
                         onValueChange = { currentFriend = it },
                         label = { Text("Nombre del Amigo") },
                         placeholder = { Text("Pepito") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFFA5F3FC),
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                            focusedLabelColor = Color(0xFFA5F3FC),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedPlaceholderColor = Color.White.copy(alpha = 0.3f),
-                            unfocusedPlaceholderColor = Color.White.copy(alpha = 0.3f)
-                        ),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("friend_name_input"),
                         singleLine = true
                     )
-                    IconButton(
-                        onClick = {
-                            if (currentFriend.trim().isNotEmpty() && !friendsList.contains(currentFriend.trim())) {
-                                friendsList.add(currentFriend.trim())
-                                currentFriend = ""
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = Color(0xFFA5F3FC)
-                        ),
+                    
+                    Box(
                         modifier = Modifier
-                            .bounceScale(addFriendBtnInteraction)
                             .size(52.dp)
+                            .bounceScale(addFriendBtnInteraction)
+                            .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 2f)
+                            .clickable(
+                                interactionSource = addFriendBtnInteraction,
+                                indication = null
+                            ) {
+                                if (currentFriend.trim().isNotEmpty() && !friendsList.contains(currentFriend.trim())) {
+                                    friendsList.add(currentFriend.trim())
+                                    currentFriend = ""
+                                }
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Agregar amigo",
-                            tint = Color(0xFF0F172A),
+                            tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -1554,8 +1603,8 @@ fun JuntadaCreateDialog(
                             items(friendsList) { friend ->
                                 Box(
                                     modifier = Modifier
+                                        .glassPanel(cornerRadius = 24f, borderWidth = 0.5f, elevation = 2f)
                                         .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                                         .clickable { friendsList.remove(friend) }
                                         .padding(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
@@ -1582,29 +1631,20 @@ fun JuntadaCreateDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.bounceScale(cancelBtnInteraction)
+                    VaquitaGlassButton(
+                        onClick = onDismiss
                     ) {
-                        Text("Cancelar", color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                        Text("Cancelar", color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
                     }
-                    Button(
+                    VaquitaGlassButton(
                         onClick = {
                             if (name.trim().isNotEmpty()) {
                                 onConfirm(name, friendsList.toList())
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFA5F3FC),
-                            contentColor = Color(0xFF0F172A),
-                            disabledContainerColor = Color.White.copy(alpha = 0.1f),
-                            disabledContentColor = Color.White.copy(alpha = 0.3f)
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        enabled = name.trim().isNotEmpty(),
-                        modifier = Modifier.bounceScale(confirmBtnInteraction)
+                        enabled = name.trim().isNotEmpty()
                     ) {
-                        Text("Comenzar", fontWeight = FontWeight.Black)
+                        Text("Comenzar", color = Color.White, fontWeight = FontWeight.Black)
                     }
                 }
             }
@@ -1630,8 +1670,8 @@ fun GastoAddDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
-                .glassPanel(cornerRadius = 70f, borderWidth = 3.0f, elevation = 16f)
-                .background(Color(0xFF0F172A).copy(alpha = 0.88f), RoundedCornerShape(28.dp))
+                .glassPanel(cornerRadius = 70f, borderWidth = 0.5f, elevation = 16f)
+                .background(Color(0xFF0F172A).copy(alpha = 0.75f), RoundedCornerShape(28.dp))
         ) {
             Column(
                 modifier = Modifier
@@ -1647,21 +1687,11 @@ fun GastoAddDialog(
                 )
 
                 // Description
-                OutlinedTextField(
+                VaquitaGlassTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("¿Qué se compró?") },
                     placeholder = { Text("Ej. Bondiola, Bebidas, Carbón") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFA5F3FC),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                        focusedLabelColor = Color(0xFFA5F3FC),
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedPlaceholderColor = Color.White.copy(alpha = 0.3f),
-                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.3f)
-                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("gasto_name_input"),
@@ -1669,21 +1699,11 @@ fun GastoAddDialog(
                 )
 
                 // Amount
-                OutlinedTextField(
+                VaquitaGlassTextField(
                     value = amountStr,
                     onValueChange = { amountStr = it },
                     label = { Text("¿Cuánto salió? (ARS)") },
                     placeholder = { Text("Ej. 15000") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFA5F3FC),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                        focusedLabelColor = Color(0xFFA5F3FC),
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedPlaceholderColor = Color.White.copy(alpha = 0.3f),
-                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.3f)
-                    ),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1708,27 +1728,22 @@ fun GastoAddDialog(
                         val interactionSource = remember { MutableInteractionSource() }
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
                                 .bounceScale(interactionSource)
+                                .glassPanel(cornerRadius = 24f, borderWidth = if (isSelected) 1.5f else 0.5f, elevation = 2f)
                                 .background(
-                                    color = if (isSelected) Color(0xFFA5F3FC)
-                                    else Color.White.copy(alpha = 0.08f)
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelected) Color.White else Color.White.copy(alpha = 0.15f),
+                                    color = if (isSelected) Color.White.copy(alpha = 0.35f)
+                                    else Color.White.copy(alpha = 0.08f),
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable(
                                     interactionSource = interactionSource,
-                                    indication = LocalIndication.current
+                                    indication = null
                                 ) { payerName = name }
                                 .padding(horizontal = 16.dp, vertical = 10.dp)
                         ) {
                             Text(
                                 text = name,
-                                color = if (isSelected) Color(0xFF0F172A)
-                                else Color.White.copy(alpha = 0.75f),
+                                color = Color.White,
                                 fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
                                 fontSize = 13.sp
                             )
@@ -1741,30 +1756,21 @@ fun GastoAddDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.bounceScale(cancelBtnInteraction)
+                    VaquitaGlassButton(
+                        onClick = onDismiss
                     ) {
-                        Text("Cancelar", color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                        Text("Cancelar", color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
                     }
-                    Button(
+                    VaquitaGlassButton(
                         onClick = {
                             val amount = amountStr.replace(',', '.').toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO
                             if (payerName.isNotEmpty() && amount > java.math.BigDecimal.ZERO) {
                                 onAdd(payerName, description, amount)
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFA5F3FC),
-                            contentColor = Color(0xFF0F172A),
-                            disabledContainerColor = Color.White.copy(alpha = 0.1f),
-                            disabledContentColor = Color.White.copy(alpha = 0.3f)
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        enabled = payerName.isNotEmpty() && (amountStr.replace(',', '.').toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO) > java.math.BigDecimal.ZERO,
-                        modifier = Modifier.bounceScale(saveBtnInteraction)
+                        enabled = payerName.isNotEmpty() && (amountStr.replace(',', '.').toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO) > java.math.BigDecimal.ZERO
                     ) {
-                        Text("Guardar", fontWeight = FontWeight.Black)
+                        Text("Guardar", color = Color.White, fontWeight = FontWeight.Black)
                     }
                 }
             }
@@ -1778,6 +1784,7 @@ fun FriendsEditDialog(
     juntada: Juntada,
     friendGroups: List<FriendGroup>,
     onAdd: (String) -> Unit,
+    onAddMultiple: (List<String>) -> Unit,
     onRemove: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1790,8 +1797,8 @@ fun FriendsEditDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
-                .glassPanel(cornerRadius = 70f, borderWidth = 3.0f, elevation = 16f)
-                .background(Color(0xFF0F172A).copy(alpha = 0.88f), RoundedCornerShape(28.dp))
+                .glassPanel(cornerRadius = 70f, borderWidth = 0.5f, elevation = 16f)
+                .background(Color(0xFF0F172A).copy(alpha = 0.75f), RoundedCornerShape(28.dp))
         ) {
             Column(
                 modifier = Modifier
@@ -1811,44 +1818,37 @@ fun FriendsEditDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
+                    VaquitaGlassTextField(
                         value = name,
                         onValueChange = { name = it },
                         label = { Text("Nombre del Amigo") },
                         placeholder = { Text("Ej. Juan, Lucas") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFFA5F3FC),
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                            focusedLabelColor = Color(0xFFA5F3FC),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedPlaceholderColor = Color.White.copy(alpha = 0.3f),
-                            unfocusedPlaceholderColor = Color.White.copy(alpha = 0.3f)
-                        ),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("add_friend_on_edit_input"),
                         singleLine = true
                     )
-                    IconButton(
-                        onClick = {
-                            if (name.trim().isNotEmpty()) {
-                                onAdd(name.trim())
-                                name = ""
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = Color(0xFFA5F3FC)
-                        ),
+
+                    Box(
                         modifier = Modifier
-                            .bounceScale(addFriendBtnInteraction)
                             .size(52.dp)
+                            .bounceScale(addFriendBtnInteraction)
+                            .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 2f)
+                            .clickable(
+                                interactionSource = addFriendBtnInteraction,
+                                indication = null
+                            ) {
+                                if (name.trim().isNotEmpty()) {
+                                    onAdd(name.trim())
+                                    name = ""
+                                }
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Agregar amigo",
-                            tint = Color(0xFF0F172A),
+                            tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -1879,36 +1879,50 @@ fun FriendsEditDialog(
                             Box(
                                 modifier = Modifier
                                     .bounceScale(groupInteraction)
-                                    .background(Color(0xFFA5F3FC).copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                                    .border(1.dp, Color(0xFFA5F3FC).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .glassPanel(cornerRadius = 24f, borderWidth = 0.5f, elevation = 2f)
+                                    .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                                     .clickable(
                                         interactionSource = groupInteraction,
-                                        indication = LocalIndication.current
+                                        indication = null
                                     ) {
-                                        group.participants.forEach { member ->
-                                            if (!juntada.participants.contains(member)) {
-                                                onAdd(member)
-                                            }
+                                        val newMembers = group.participants.filter { !juntada.participants.contains(it) }
+                                        if (newMembers.isNotEmpty()) {
+                                            onAddMultiple(newMembers)
                                         }
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Groups,
-                                        contentDescription = null,
-                                        tint = Color(0xFFA5F3FC),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = group.name,
-                                        color = Color(0xFFA5F3FC),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(100.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Groups,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = group.name,
+                                            color = Color.White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${group.participants.size} miembros",
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1936,8 +1950,8 @@ fun FriendsEditDialog(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .glassPanel(cornerRadius = 24f, borderWidth = 0.5f, elevation = 1f)
                                         .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
                                         .padding(horizontal = 14.dp, vertical = 10.dp)
                                 ) {
                                     Row(
@@ -1951,9 +1965,11 @@ fun FriendsEditDialog(
                                             color = Color.White,
                                             fontSize = 14.sp
                                         )
-                                        IconButton(
-                                            onClick = { onRemove(friend) },
-                                            modifier = Modifier.size(24.dp)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clickable { onRemove(friend) },
+                                            contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Close,
@@ -1973,16 +1989,10 @@ fun FriendsEditDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    Button(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFA5F3FC),
-                            contentColor = Color(0xFF0F172A)
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.bounceScale(okBtnInteraction)
+                    VaquitaGlassButton(
+                        onClick = onDismiss
                     ) {
-                        Text("Aceptar", fontWeight = FontWeight.Black)
+                        Text("Aceptar", color = Color.White, fontWeight = FontWeight.Black)
                     }
                 }
             }
@@ -2011,8 +2021,8 @@ fun GroupManagerDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
-                .glassPanel(cornerRadius = 70f, borderWidth = 3.0f, elevation = 16f)
-                .background(Color(0xFF0F172A).copy(alpha = 0.88f), RoundedCornerShape(28.dp))
+                .glassPanel(cornerRadius = 70f, borderWidth = 0.5f, elevation = 16f)
+                .background(Color(0xFF0F172A).copy(alpha = 0.75f), RoundedCornerShape(28.dp))
         ) {
             Column(
                 modifier = Modifier
@@ -2031,9 +2041,12 @@ fun GroupManagerDialog(
                         fontWeight = FontWeight.Black,
                         color = Color.White
                     )
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.bounceScale(closeInteraction)
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .bounceScale(closeInteraction)
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -2072,8 +2085,8 @@ fun GroupManagerDialog(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .glassPanel(cornerRadius = 24f, borderWidth = 0.5f, elevation = 2f)
                                         .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(14.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
                                         .padding(14.dp)
                                 ) {
                                     Row(
@@ -2095,9 +2108,11 @@ fun GroupManagerDialog(
                                                 color = Color.White.copy(alpha = 0.6f)
                                             )
                                         }
-                                        IconButton(
-                                            onClick = { viewModel.deleteFriendGroup(group) },
-                                            modifier = Modifier.size(32.dp)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clickable { viewModel.deleteFriendGroup(group) },
+                                            contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
@@ -2113,7 +2128,7 @@ fun GroupManagerDialog(
                     }
                 }
 
-                Divider(color = Color.White.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Creation parameters
                 Text(
@@ -2123,21 +2138,11 @@ fun GroupManagerDialog(
                     fontSize = 14.sp
                 )
 
-                OutlinedTextField(
+                VaquitaGlassTextField(
                     value = newGroupName,
                     onValueChange = { newGroupName = it },
                     label = { Text("Nombre del Grupo") },
                     placeholder = { Text("Ej. Familia, Fútbol, Facu") },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFA5F3FC),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                        focusedLabelColor = Color(0xFFA5F3FC),
-                        unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedPlaceholderColor = Color.White.copy(alpha = 0.3f),
-                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.3f)
-                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("group_name_input"),
@@ -2149,44 +2154,36 @@ fun GroupManagerDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
+                    VaquitaGlassTextField(
                         value = currentMemberName,
                         onValueChange = { currentMemberName = it },
                         label = { Text("Miembro del Grupo") },
                         placeholder = { Text("Ej. Lucas") },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFFA5F3FC),
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                            focusedLabelColor = Color(0xFFA5F3FC),
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedPlaceholderColor = Color.White.copy(alpha = 0.3f),
-                            unfocusedPlaceholderColor = Color.White.copy(alpha = 0.3f)
-                        ),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("group_member_name_input"),
                         singleLine = true
                     )
-                    IconButton(
-                        onClick = {
-                            if (currentMemberName.trim().isNotEmpty() && !newGroupMembers.contains(currentMemberName.trim())) {
-                                newGroupMembers.add(currentMemberName.trim())
-                                currentMemberName = ""
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = Color(0xFFA5F3FC)
-                        ),
+                    Box(
                         modifier = Modifier
-                            .bounceScale(addMemberInteraction)
                             .size(52.dp)
+                            .bounceScale(addMemberInteraction)
+                            .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 2f)
+                            .clickable(
+                                interactionSource = addMemberInteraction,
+                                indication = null
+                            ) {
+                                if (currentMemberName.trim().isNotEmpty() && !newGroupMembers.contains(currentMemberName.trim())) {
+                                    newGroupMembers.add(currentMemberName.trim())
+                                    currentMemberName = ""
+                                }
+                            },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Agregar miembro",
-                            tint = Color(0xFF0F172A),
+                            tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -2201,8 +2198,8 @@ fun GroupManagerDialog(
                         items(newGroupMembers) { member ->
                             Box(
                                 modifier = Modifier
+                                    .glassPanel(cornerRadius = 24f, borderWidth = 0.5f, elevation = 1f)
                                     .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                                     .clickable { newGroupMembers.remove(member) }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                             ) {
@@ -2227,7 +2224,7 @@ fun GroupManagerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    Button(
+                    VaquitaGlassButton(
                         onClick = {
                             if (newGroupName.trim().isNotEmpty() && newGroupMembers.isNotEmpty()) {
                                 viewModel.createFriendGroup(newGroupName, newGroupMembers.toList())
@@ -2235,17 +2232,9 @@ fun GroupManagerDialog(
                                 newGroupMembers.clear()
                             }
                         },
-                        enabled = newGroupName.trim().isNotEmpty() && newGroupMembers.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFA5F3FC),
-                            contentColor = Color(0xFF0F172A),
-                            disabledContainerColor = Color.White.copy(alpha = 0.1f),
-                            disabledContentColor = Color.White.copy(alpha = 0.3f)
-                        ),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.bounceScale(saveGroupInteraction)
+                        enabled = newGroupName.trim().isNotEmpty() && newGroupMembers.isNotEmpty()
                     ) {
-                        Text("Crear Grupo", fontWeight = FontWeight.Black)
+                        Text("Crear Grupo", color = Color.White, fontWeight = FontWeight.Black)
                     }
                 }
             }
