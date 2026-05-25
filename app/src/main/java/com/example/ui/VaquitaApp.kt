@@ -735,114 +735,103 @@ fun DetailScreen(
                     .padding(horizontal = 16.dp, vertical = 16.dp),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // Glass Pill for Navigation Tabs
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 10f)
+                        .padding(4.dp)
                 ) {
-                    // Glass Pill for Navigation Tabs
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 10f)
-                            .padding(4.dp)
-                    ) {
-                        val currentOffset = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                    val currentOffset = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                    val rawFraction = currentOffset - kotlin.math.floor(currentOffset.toDouble()).toFloat()
+                    val fraction = if (rawFraction < 0) rawFraction + 1f else rawFraction
+                    val stretch = (kotlin.math.sin(fraction * Math.PI) * 0.15).toFloat().coerceAtLeast(0f)
+                    val widthFraction = (0.5f + stretch).coerceAtMost(1f)
 
-                        // Sliding Glass Pill Indicator
-                        Box(modifier = Modifier.matchParentSize()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(0.5f)
-                                    .fillMaxHeight()
-                                    .graphicsLayer {
-                                        translationX = size.width * currentOffset
-                                    }
-                                    .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 2f)
-                            )
-                        }
-
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            listOf("Gastos 💸", "Saldos 📊").forEachIndexed { index, label ->
-                                val isSelected = activeTab == index
-                                val tabInteraction = remember { MutableInteractionSource() }
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(100.dp))
-                                        .bounceScale(tabInteraction)
-                                        .clickable(
-                                            interactionSource = tabInteraction,
-                                            indication = null
-                                        ) {
-                                            coroutineScope.launch {
-                                                pagerState.animateScrollToPage(
-                                                    page = index,
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioLowBouncy,
-                                                        stiffness = Spring.StiffnessLow
-                                                    )
-                                                )
-                                            }
-                                        }
-                                        .padding(vertical = 12.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
-                                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                                        fontSize = 13.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Glass Pill for Action Button (only if activeTab == 0 && participants.isNotEmpty())
-                    AnimatedVisibility(
-                        visible = activeTab == 0 && safeJuntada.participants.isNotEmpty(),
-                        enter = scaleIn(spring(stiffness = Spring.StiffnessMediumLow)),
-                        exit = scaleOut(spring(stiffness = Spring.StiffnessMediumLow))
-                    ) {
+                    // Sliding Glass Pill Indicator
+                    Box(modifier = Modifier.matchParentSize()) {
                         Box(
                             modifier = Modifier
-                                .bounceScale(addGastoInteraction)
-                                .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 10f)
-                                .clickable(
-                                    interactionSource = addGastoInteraction,
-                                    indication = null,
-                                    onClick = { showAddGastoDialog = true }
-                                )
-                                .padding(4.dp)
-                        ) {
+                                .fillMaxHeight()
+                                .fillMaxWidth(widthFraction)
+                                .graphicsLayer {
+                                    val parentWidth = size.width / widthFraction
+                                    val centerFraction = currentOffset * 0.5f + 0.25f
+                                    translationX = (parentWidth * centerFraction) - (size.width / 2f)
+                                }
+                                .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 2f)
+                        )
+                    }
+
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        listOf("Gastos 💸", "Saldos 📊").forEachIndexed { index, label ->
+                            val isSelected = activeTab == index
+                            val tabInteraction = remember { MutableInteractionSource() }
                             Box(
                                 modifier = Modifier
-                                    .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(100.dp))
-                                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(100.dp))
+                                    .bounceScale(tabInteraction)
+                                    .clickable(
+                                        interactionSource = tabInteraction,
+                                        indication = null
+                                    ) {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(
+                                                page = index,
+                                                animationSpec = spring(
+                                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                                    stiffness = Spring.StiffnessLow
+                                                )
+                                            )
+                                        }
+                                    }
+                                    .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = "Agregar Gasto",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        "Nuevo", 
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Black, 
-                                        fontSize = 14.sp
-                                    )
-                                }
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
                             }
                         }
                     }
                 }
             }
-        }
+        },
+        floatingActionButton = {
+            val addGastoInteraction = remember { MutableInteractionSource() }
+            AnimatedVisibility(
+                visible = activeTab == 0 && safeJuntada.participants.isNotEmpty(),
+                enter = scaleIn(spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
+                exit = scaleOut(spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .bounceScale(addGastoInteraction)
+                        .size(60.dp)
+                        .glassPanel(cornerRadius = 100f, borderWidth = 0.5f, elevation = 10f)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.15f))
+                        .clickable(
+                            interactionSource = addGastoInteraction,
+                            indication = null,
+                            onClick = { showAddGastoDialog = true }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Agregar Gasto",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = androidx.compose.material3.FabPosition.End
     ) { innerPadding ->
         Column(
             modifier = Modifier
